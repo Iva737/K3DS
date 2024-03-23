@@ -1,181 +1,119 @@
 import pygame
-import math
 from time import time
-
-class Player():
-    hp = 100
-    collision = False
-    collisionPosition = (0, 0)
-    vx, vy = 0, 0
-    def __init__(self, name):
-        global cub
-        self.name = name
-        self.x, self.y = 0, 0
-        self.speed = 0
-        self.w, self.h = 1.4*cub, 2.9*cub
-        self.W, self.H = 1.4,     2.9
-    def Debug(self):
-        global mx, my
-        color = ((255, 0, 0) if self.collision else (0, 255, 0))
-        pygame.draw.circle(sc, color, (mx//2, my//2), 3)
-        pygame.draw.rect(sc, color, (mx//2-self.w//2, my//2-self.h//2, self.w, self.h), 1)
-    def checkCollision(self):
-        global t
-        px, py = self.x-self.W/2, self.y-self.H/2
-        self.collision = False
-        for x in range(math.ceil(px+self.W)-int(px)):
-            for y in range(math.ceil(py+self.H)-int(py)):
-                mat = getPointLvl(x+int(px), y+int(py))
-                if mat!="0":
-                    self.collision = True
-                    self.collisionPosition = (x+int(px), y+int(py))
-                    if mat == "2":
-                        self.hp -= 1 * t; self.hp = (self.hp if self.hp>=0 else 0)
-        return self.collision
-
-def loadTextures(loadImg):
-    global textures
-    # load img file: {w, h, n}
-    for i in loadImg.keys():
-        name = i.split('.')[0]
-        textures[name+"Prime"] = pygame.image.load(path+i)
-        if "w" in loadImg[i] and "h" in loadImg[i]:
-            textures[name] = pygame.transform.scale(textures[name+"Prime"], (cub*loadImg[i]["w"], cub*loadImg[i]["h"]))
-
-def loadLevel(n):
-    global level
-    # load Map
-    file = open(f"{n}map.txt", 'r')
-    text = file.read().split('\n')[0:-1]
-    file.close()
-    level = []
-    for i in text:
-        level.append(list(i))
-
-def getPointLvl(x, y):
-    if 0<=y<len(level) and 0<=x<len(level[y]):
-        return level[y][x]
-    else:
-        return "0"
-
-def checkLevel():
-    global level, px, py, mx, my, levelX, levelY, cub
-    pass
-
-def drawLevel():
-    global level
-
-pygame.init()
-sc = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-mx, my = sc.get_width(), sc.get_height()
+from cfg import*
+from Map import Map, Block
+from Player import Player
 
 
-Debug = False
-t1, t2 = 0, 0
-path = "assets/img/"
-textures = {}
-loadImg = { # load img file: {w, h, n}
-"player.png": {"w": 3, "h": 3, "n": 1},
-"wall.png": {"w": 1.03, "h": 1.03, "n": 1},
-"cactus.png": {"w": 1.03, "h": 1.03, "n": 1}
-}
-button = [False, False, False, False]
-CLOSE = False
-level = []
-levelX = 0
-levelY = 0
-win = False
+def loadTextures():
+    global loadImg, cub
+    for name in loadImg.keys():
+        textures[name+"Prime"] = []
+        textures[    name    ] = []
+        for i in range(len( loadImg[name]["files"] )):
+            textures[name+"Prime"].append( pygame.image.load(path+loadImg[name]["files"][i]) )
+            if "w" in loadImg[name] and "h" in loadImg[name]:
+                textures[name].append( pygame.transform.scale(textures[name+"Prime"][i], (cub*loadImg[name]["w"], cub*loadImg[name]["h"])) )
 
-cub = (mx if mx > my else my)*.03
-p = Player("X3mall")
-p.x, p.y = 5, 17
-p.speed = 3
-mapX, mapY = mx//2 - p.x*cub, my//2 - p.y*cub
+def getTick(texture):
+    global textures, tick
+    return tick%len(textures[texture])
 
-loadTextures(loadImg)
-loadLevel(1)
-    
+def getSpd(speed):
+    return (-maxSpeed if speed<-maxSpeed else (maxSpeed if speed>maxSpeed else speed))
 
-textures["fon"] = pygame.Surface((len(level[0])*cub, len(level)*cub))
-for i in range(len(level)):
-    for j in range(len(level[0])):
-        if getPointLvl(j, i) == '1':
-            textures["fon"].blit(textures["wall"], (j*cub, i*cub))
-        elif getPointLvl(j, i) == '2':
-            textures["fon"].blit(textures["cactus"], (j*cub, i*cub))
-textures["fon"].set_colorkey((0, 0, 0))
+def evtKEY(evt):
+    global button
+    mat = evt.type == pygame.KEYDOWN
+    if (evt.key == pygame.K_LEFT or evt.key == pygame.K_a):
+        button[0] = mat
+    elif (evt.key == pygame.K_RIGHT or evt.key == pygame.K_d):
+        button[1] = mat
 
-
-
-
-
-while not CLOSE:
-    t = t2-t1
-    sc.fill((52, 52, 52))
-    mapX, mapY = mx//2 - p.x*cub, my//2 - p.y*cub
-    t1 = time()
-    sc.blit(textures["fon"], (mapX, mapY))
+def events():
+    global Close, Debug, t, p
     for evt in pygame.event.get():
         if evt.type == pygame.QUIT or (evt.type == pygame.KEYDOWN and evt.key == pygame.K_ESCAPE):
-            CLOSE = True
-        elif evt.type == pygame.KEYDOWN and evt.key == pygame.K_F3:
-            Debug = not Debug
-        elif evt.type == pygame.KEYDOWN or evt.type == pygame.KEYUP:
-            mat = evt.type == pygame.KEYDOWN
-            if (evt.key == pygame.K_LEFT or evt.key == pygame.K_a):
-                button[0] = mat
-            elif (evt.key == pygame.K_UP or evt.key == pygame.K_w):
-                button[1] = mat
-            elif (evt.key == pygame.K_RIGHT or evt.key == pygame.K_d):
-                button[2] = mat
-            elif (evt.key == pygame.K_DOWN or evt.key == pygame.K_s):
-                button[3] = mat
-    if not win:
-        p.vy += t * .4
-    if button[1]:
-        p.vy = (p.vy - p.speed * t * .3 if -p.speed<p.vy else -p.speed)
+            Close = True
+        elif evt.type == pygame.KEYDOWN:
+            if evt.key == pygame.K_F3: Debug = not Debug
+            elif evt.key == pygame.K_SPACE and p.collision:
+                p.vy -= p.speedY
+            evtKEY(evt)
+        elif evt.type == pygame.KEYUP:
+            evtKEY(evt)
+
+
+def physics():
+    global gravity, button, level, p, t
+    p.vy += t * gravity
     if button[0]:
-        p.vx = (p.vx - p.speed * t * .3 if -p.speed<p.vx else -p.speed)
-    if button[2]:
-        p.vx = (p.vx + p.speed * t * .3 if p.speed>p.vx else p.speed)
-    if button[3]:
-        p.vy = (p.vy + p.speed * t * .3 if p.speed>p.vy else p.speed)
+        p.vx = (p.vx - p.speedX * t * .3 if -p.speedX<p.vx else -p.speedX)
+    if button[1]:
+        p.vx = (p.vx + p.speedX * t * .3 if p.speedX>p.vx else p.speedX)
+    
+    p.vx = getSpd(p.vx)
     p.x += p.vx * t * 10
-    if not win and p.checkCollision():
+    if p.getCollisionBox(level, t):
         p.x -= p.vx * t * 10
-        p.vx *= .3
+        p.vx *= .1
+    
+    p.vy = getSpd(p.vy)
     p.y += p.vy * t * 10
-    if not win and p.checkCollision():
+    if p.getCollisionBox(level, t):
         p.y -= p.vy * t * 10
-        p.vy *= .3
-        p.vx *= .98
-    if not win:
-        p.checkCollision()
-    if win:
-        if   not 0<=p.x: p.vx = .7*abs(p.vx)
-        elif not p.x<len(level[0]): p.vx = -.7*abs(p.vx)
-        if   not 0<=p.y: p.vy = .7*abs(p.vy)
-        elif not p.y<len( level  ): p.vy = -.7*abs(p.vy)
-        
-    sc.blit(textures["player"], (mx//2-textures["player"].get_width()//2, my//2-textures["player"].get_height()//2))
+        p.vy *= .1
+        if not (button[0] or button[1]):
+            p.vx *= .7
+
+def draws():
+    global mx, my, textures, p, level, mapX, mapY
+    sc.fill((0x34, 0x34, 0x34))
+    for y in range(level.height):
+        for x in range(level.width):
+            mat = level.getBlock(x, y).texture
+            if mat != "None":
+                sc.blit(textures[mat][getTick(mat)], (x*cub+mapX, y*cub+mapY))
+    pl = textures["X3mall"][getTick("X3mall")]
+    sc.blit(pl, (mx//2-pl.get_width()//2, my//2-pl.get_height()//2))
     pygame.draw.rect(sc, (255, 0, 0), (7, 7, 3*cub*p.hp//100, cub*.5))
     pygame.draw.rect(sc, (0, 0, 0), (0, 0, 3*cub+14, cub*.5+14), 5)
+
+def drawDebug():
+    global mx, my, mapX, mapY, p, cub
+    pygame.draw.line(sc, (255, 0, 0), (0, mapY), (mx, mapY), 1)
+    pygame.draw.line(sc, (0, 255, 0), (mapX, 0), (mapX, my), 1)
+    pygame.draw.rect(sc, (0,255,255), (mapX, mapY, level.width*cub, level.height*cub), 1)
+    pygame.draw.circle(sc, (0, 255, 0), (mx//2, my//2), 3)
+    pygame.draw.rect(sc, (0, 255, 0), (mx//2-p.width*cub//2+p.widDev*cub, my//2-p.height*cub//2+p.heiDev*cub, p.width*cub, p.height*cub), 1)
+
+def main():
+    global Close, Debug, tick, t, mapX, mapY
+    while not Close:
+        events()
+        physics()
+        mapX, mapY = mx//2 - p.x*cub, my//2 - p.y*cub
+        draws()
+        if Debug: drawDebug()
+        
+        pygame.display.update()
+        t = 1/clock.tick(FPS); p.t = t
+        tick = ((int(pygame.time.get_ticks()))//timeTick)%30
+
+if __name__=="__main__":
+    pygame.init()
+    clock = pygame.time.Clock()
+    sc = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    mx, my = sc.get_width(), sc.get_height()
+    cub = (mx if mx > my else my)*.03
     
+    loadTextures()
+    level = Map( level = 1 )
+    p = Player()
+    p.resX = 4
+    p.resY = 4
+    p.x = p.resX
+    p.y = p.resY
     
-    if Debug:
-        p.Debug()
-        pygame.draw.line(sc, (255, 0, 0), (0, mapY), (mx, mapY), 1)
-        pygame.draw.line(sc, (0, 255, 0), (mapX, 0), (mapX, my), 1)
-        pygame.draw.rect(sc, (0,255,255), (mapX, mapY, len(level[0])*cub, len(level)*cub), 1)
-    if not win and (p.hp<=0 or not (0<p.y<len(level) and 0<p.x)):
-        p.x, p.y = 5, 17; p.vx, p.vy = 0, 0
-        p.hp = 100
-    if not win and p.x>len(level[0]):
-        win = True
-        Debug = True
-        p.vx -= 2
-        p.vy += .78
-        p.hp = 999
-    pygame.display.update()
-    t2 = time()
+    main()
 
